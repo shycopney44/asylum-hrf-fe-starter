@@ -1,47 +1,54 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
-import testData from '../data/test_data.json';
 import { useLocalStorage } from '../hooks/useLocalStorage.js';
 
 const AppContext = createContext({});
 
 /**
- * TODO: Ticket 2:
- * - Use axios to fetch the data
- * - Store the data
- * - Populate the graphs with the stored data
+ * Build Sprint 2:
+ * - Replaces dummy data with live API data
+ * - Stores and provides fiscal and citizenship data
+ * - Ensures graphs can render using updated context
  */
 const useAppContextProvider = () => {
-  const [graphData, setGraphData] = useState(testData);
+  const [graphData, setGraphData] = useState({});
   const [isDataLoading, setIsDataLoading] = useState(false);
 
   useLocalStorage({ graphData, setGraphData });
 
-  const getFiscalData = () => {
-    // TODO: Replace this with functionality to retrieve the data from the fiscalSummary endpoint
-    const fiscalDataRes = testData;
-    return fiscalDataRes;
-  };
-
-  const getCitizenshipResults = async () => {
-    // TODO: Replace this with functionality to retrieve the data from the citizenshipSummary endpoint
-    const citizenshipRes = testData.citizenshipResults;
-    return citizenshipRes;
-  };
+  const getFiscalData = () => graphData;
+  const getCitizenshipResults = () => graphData?.citizenshipResults ?? [];
 
   const updateQuery = async () => {
     setIsDataLoading(true);
   };
 
   const fetchData = async () => {
-    // TODO: fetch all the required data and set it to the graphData state
+    try {
+      const [fiscalRes, citizenshipRes] = await Promise.all([
+        axios.get('https://asylum-be.onrender.com/fiscalSummary'),
+        axios.get('https://asylum-be.onrender.com/citizenshipSummary'),
+      ]);
+
+      const combinedData = {
+        ...fiscalRes.data,
+        citizenshipResults: citizenshipRes.data,
+      };
+
+      setGraphData(combinedData);
+    } catch (error) {
+      console.error('Error fetching graph data:', error);
+    } finally {
+      setIsDataLoading(false);
+    }
   };
 
   const clearQuery = () => {
     setGraphData({});
   };
 
-  const getYears = () => graphData?.yearResults?.map(({ fiscal_year }) => Number(fiscal_year)) ?? [];
+  const getYears = () =>
+    graphData?.yearResults?.map(({ fiscal_year }) => Number(fiscal_year)) ?? [];
 
   useEffect(() => {
     if (isDataLoading) {
@@ -56,6 +63,8 @@ const useAppContextProvider = () => {
     updateQuery,
     clearQuery,
     getYears,
+    getFiscalData,
+    getCitizenshipResults,
   };
 };
 
@@ -65,6 +74,5 @@ export function useAppContext() {
 
 export function ProvideAppContext({ children }) {
   const contextValue = useAppContextProvider();
-
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 }
